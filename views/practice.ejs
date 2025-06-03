@@ -1,0 +1,221 @@
+<!-- views/practice.ejs -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Trading Practice</title>
+    <!-- Load Plotly.js from node_modules -->
+    <script src="/plotly/plotly.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #status {
+        margin-bottom: 20px;
+      }
+      #chart {
+        width: 100%;
+        height: 400px;
+      }
+      #controls {
+        margin-top: 20px;
+        margin-bottom: 20px;
+      }
+      button {
+        margin-right: 10px;
+        padding: 0.4rem 0.8rem;
+      }
+      #feedback {
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+      }
+      #buyAmountDiv {
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div>
+      <!-- Link back to Profile Dashboard -->
+      <a href="/profile">← Back to Profile</a>
+    </div>
+
+    <h2>Trading Practice</h2>
+    <p><strong>Session ID:</strong> <%= sessionId %></p>
+
+    <div id="status">
+      <p>
+        Balance: $<span id="balance">0.00</span>
+        &nbsp;&nbsp; Shares Held: <span id="shares_held">0</span>
+      </p>
+      <p>Hint: <span id="hint"></span></p>
+    </div>
+
+    <div id="chart"></div>
+
+    <div id="controls">
+      <button id="holdBtn">Hold</button>
+      <button id="buyBtn">Buy</button>
+      <button id="sellBtn">Sell</button>
+    </div>
+
+    <div id="buyAmountDiv" style="display: none;">
+      <label>
+        Amount to Spend: $
+        <input type="number" id="buyAmountInput" min="0" step="0.01" />
+      </label>
+      <button id="confirmBuyBtn">Confirm Buy</button>
+      <button id="cancelBuyBtn">Cancel</button>
+    </div>
+
+    <div id="feedback"></div>
+
+    <script>
+      (function () {
+        const sessionId = "<%= sessionId %>";
+        const ticker = "<%= ticker %>";
+        const baseURL = "http://localhost:5001"; // Flask API
+        let done = false;
+
+        async function updateStateAndChart() {
+          if (done) return;
+          try {
+            const resp = await fetch(
+              `${baseURL}/state_and_hint?session_id=${sessionId}`
+            );
+            const data = await resp.json();
+            if (data.error) {
+              alert("Error: " + data.error);
+              return;
+            }
+            document.getElementById("balance").innerText =
+              data.balance.toFixed(2);
+            document.getElementById("shares_held").innerText = data.shares_held;
+            document.getElementById("hint").innerText = data.hint;
+            drawChart(data.recent_bars);
+          } catch (err) {
+            console.error("updateStateAndChart() failed:", err);
+          }
+        }
+
+        function drawChart(bars) {
+          const dates = bars.map((b) => b.date);
+          const open = bars.map((b) => b.open);
+          const high = bars.map((b) => b.high);
+          const low = bars.map((b) => b.low);
+          const close = bars.map((b) => b.close);
+
+          const trace = {
+            x: dates,
+            open: open,
+            high: high,
+            low: low,
+            close: close,
+            type: "candlestick",
+            xaxis: "x",
+            yaxis: "y",
+          };
+          const layout = {
+            dragmode: "zoom",
+            margin: { r: 10, t: 25, b: 40, l: 60 },
+            showlegend: false,
+            xaxis: { rangeslider: { visible: false } },
+          };
+          Plotly.newPlot("chart", [trace], layout);
+        }
+
+        async function sendAction(action, amount = null) {
+          if (done) return;
+          const payload = { session_id: sessionId, action: action };
+          if (action === 1) {
+            payload.amount = amount;
+          }
+          try {
+            const resp = await fetch(`${baseURL}/take_action`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+            if (data.error) {
+              alert("Error: " + data.error);
+              return;
+            }
+
+            // Display feedback
+            const correctFlag = data.correct ? 1 : 0;
+            const correctness = data.correct ? "✅ CORRECT" : "❌ INCORRECT";
+            const recommendedText = ["Hold", "Buy", "Sell"][
+              data.agent_recommendation
+            ];
+            const predictedStr = data.predicted_price.toFixed(2);
+
+            const fbDiv = document.getElementById("feedback");
+            fbDiv.innerHTML = `
+              <p><strong>${correctness}</strong>
+              &nbsp;&nbsp; Agent recommended: <em>${recommendedText}</em></p>
+              <p>Predicted Next Price: $${predictedStr}</p>
+              <hr>
+              <p>${data.llm_explanation.replace(/\n/g, "<br>")}</p>
+            `;
+
+            // Record this trade in our Express server
+            await fetch("/record_trade", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                session_uuid: sessionId,
+                ticker: ticker,
+                action: action,
+                correct: correctFlag,
+                reward: data.reward,
+              }),
+            });
+
+            if (data.done) {
+              done = true;
+              fbDiv.innerHTML += "<p><em>Practice complete.</em></p>";
+            } else {
+              updateStateAndChart();
+            }
+          } catch (err) {
+            console.error("sendAction() failed:", err);
+          }
+        }
+
+        document.getElementById("holdBtn").addEventListener("click", () => {
+          sendAction(0);
+        });
+        document.getElementById("sellBtn").addEventListener("click", () => {
+          sendAction(2);
+        });
+        document.getElementById("buyBtn").addEventListener("click", () => {
+          document.getElementById("buyAmountDiv").style.display = "block";
+        });
+        document
+          .getElementById("confirmBuyBtn")
+          .addEventListener("click", () => {
+            const amtField = document.getElementById("buyAmountInput");
+            const amt = parseFloat(amtField.value);
+            if (isNaN(amt) || amt <= 0) {
+              alert("Enter a valid amount to buy.");
+              return;
+            }
+            document.getElementById("buyAmountDiv").style.display = "none";
+            amtField.value = "";
+            sendAction(1, amt);
+          });
+        document.getElementById("cancelBuyBtn").addEventListener("click", () => {
+          document.getElementById("buyAmountDiv").style.display = "none";
+          document.getElementById("buyAmountInput").value = "";
+        });
+
+        // On page load, fetch the first state/hint
+        updateStateAndChart();
+      })();
+    </script>
+  </body>
+</html>

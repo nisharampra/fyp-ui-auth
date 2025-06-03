@@ -1,0 +1,118 @@
+<!-- views/profile.ejs -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title><%= username %>'s Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+      }
+      h1, h2 {
+        margin-bottom: 10px;
+      }
+      .summary {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+      }
+      .tips {
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border-left: 4px solid #007bff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .correct {
+        color: green;
+        font-weight: bold;
+      }
+      .incorrect {
+        color: red;
+        font-weight: bold;
+      }
+      .nav {
+        margin-bottom: 20px;
+      }
+      a {
+        margin-right: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <span>Logged in as <strong><%= username %></strong></span>
+      &nbsp;|&nbsp;
+      <a href="/">Home</a>
+      <a href="/logout">Logout</a>
+    </div>
+
+    <h1><%= username %>'s Trading Dashboard</h1>
+
+    <!-- SUMMARY METRICS -->
+    <div class="summary">
+      <h2>Summary</h2>
+      <p>Total Trades: <strong><%= summary.totalTrades %></strong></p>
+      <p>Accuracy: <strong><%= summary.accuracy %> %</strong></p>
+      <p>Total Profit (sum of rewards): <strong>$<%= summary.totalProfit %></strong></p>
+    </div>
+
+    <!-- TIPS TO IMPROVE -->
+    <div class="tips">
+      <h2>Tips to Improve</h2>
+      <ul>
+        <% tips.forEach(function(tip) { %>
+          <li><%= tip %></li>
+        <% }); %>
+      </ul>
+    </div>
+
+    <!-- TRADE HISTORY TABLE -->
+    <h2>Trade History</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Ticker</th>
+          <th>Action</th>
+          <th>Correct?</th>
+          <th>Reward</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (history.length === 0) { %>
+          <tr>
+            <td colspan="5" style="text-align:center;">No trades recorded yet.</td>
+          </tr>
+        <% } %>
+        <% history.forEach(function(row) { %>
+          <tr>
+            <td><%= new Date(row.timestamp).toLocaleString() %></td>
+            <td><%= row.ticker %></td>
+            <td>
+              <% if (row.action === 0) { %>Hold<% } %>
+              <% if (row.action === 1) { %>Buy<% } %>
+              <% if (row.action === 2) { %>Sell<% } %>
+            </td>
+            <td class="<%= row.correct === 1 ? 'correct' : 'incorrect' %>">
+              <%= row.correct === 1 ? 'Yes' : 'No' %>
+            </td>
+            <td>$<%= row.reward.toFixed(2) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </body>
+</html>

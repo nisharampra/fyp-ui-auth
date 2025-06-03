@@ -1,0 +1,49 @@
+<!-- index.ejs -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Select Ticker</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+      }
+      .nav {
+        margin-bottom: 20px;
+      }
+      a {
+        margin-right: 15px;
+      }
+      select,
+      button {
+        font-size: 1rem;
+        padding: 0.4rem 0.6rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <span>Logged in as <strong><%= currentUser.username %></strong></span>
+-     &nbsp;|&nbsp;
+-     <a href="/logout">Logout</a>
++     &nbsp;|&nbsp;
++     <a href="/profile">Profile</a>
++     <a href="/change-password">Change Password</a>
++     <a href="/logout">Logout</a>
+    </div>
+
+    <h1>Choose a Ticker to Practice</h1>
+    <form action="/start" method="POST">
+      <select name="ticker" required>
+        <option value="" disabled selected>-- Select Ticker --</option>
+        <% tickers.forEach(function(t) { %>
+          <option value="<%= t %>"><%= t %></option>
+        <% }); %>
+      </select>
+      <button type="submit">Start Practice</button>
+    </form>
+  </body>
+</html>
+
+
